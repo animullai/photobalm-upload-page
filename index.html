@@ -34,7 +34,7 @@ async function directUpload(file){
   // get a one-time upload URL from your Cloudflare Images dashboard
   const tokenResp = await fetch('https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID/images/v2/direct_upload', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer YOUR_IMAGES_TOKEN' }
+      headers: { 'Authorization': 'Bearer iKo_f8WwXCdqG9NzBplbLzg6PUhMLFxD5X_HBsXx' }
   }).then(r => r.json());
 
   const uploadURL = tokenResp.result.uploadURL;
