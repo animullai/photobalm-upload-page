@@ -1,58 +1,67 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>Photobalm • upload</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- quick styling with Tailwind -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
 </head>
+
 <body class="p-8">
   <h1 class="text-3xl font-bold mb-6">Upload your photo</h1>
 
+  <!-- file picker -->
   <input id="file" type="file" class="mb-4" accept="image/*">
+
+  <!-- action button -->
   <button id="go" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
     Get a quote
   </button>
+
+  <!-- GPT’s reply will appear here -->
   <pre id="result" class="mt-6 whitespace-pre-wrap text-gray-800"></pre>
 
+  <!-- JavaScript – put at the very end so the DOM above already exists -->
   <script type="module">
-    /* DOM handles */
-    const fileInp = document.querySelector('#file');
-    const goBtn   = document.querySelector('#go');
-    const result  = document.querySelector('#result');
+  /* ---------- 1 · grab the DOM handles ---------- */
+  const fileInp = document.querySelector('#file');
+  const goBtn   = document.querySelector('#go');
+  const result  = document.querySelector('#result');
 
-    /* endpoints (only these 2) */
-    const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';
-    const DIRECT = WORKER + '/direct-upload';      // POST for upload URL
-    const CHAT   = WORKER;                         // POST for GPT chat
+  /* ---------- 2 · endpoints ---------- */
+  const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';   // your Worker root
+  const DIRECT = WORKER + '/direct-upload';   // we’ll POST here
+  const CHAT   = WORKER + '/chat';            // we’ll POST here
 
-    /* click handler */
-    goBtn.addEventListener('click', async () => {
-      const file = fileInp.files[0];
-      if (!file) { result.textContent = 'Please choose an image first.'; return; }
+  /* ---------- 3 · click handler ---------- */
+  goBtn.addEventListener('click', async () => {
+    const file = fileInp.files[0];
+    if (!file) { result.textContent = 'Please choose an image first.'; return; }
 
-      try {
-        /* 1-shot upload URL from Worker */
-        const upRes   = await fetch(DIRECT, { method:'POST' }).then(r => r.json());
-        const uploadURL = upRes.uploadURL;
+    try {
+      /* 3-a · ask the Worker for a 1-time Cloudflare Images upload URL */
+      const upRes = await fetch(DIRECT, { method:'POST' }).then(r => r.json());
+      const uploadURL = upRes.uploadURL;
 
-        /* upload the actual file */
-        const fd   = new FormData(); fd.append('file', file);
-        const imJs = await fetch(uploadURL, { method:'POST', body: fd }).then(r => r.json());
-        const img  = imJs.result.variants[0];               // public https
+      /* 3-b · actually upload the file */
+      const fd   = new FormData();  fd.append('file', file);
+      const imRes = await fetch(uploadURL, { method:'POST', body: fd }).then(r => r.json());
+      const imageURL = imRes.result.variants[0];        // public https URL
 
-        /* ask the bot */
-        const chat = await fetch(CHAT, {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify({ message:'', image_url: img })
-        }).then(r => r.json());
+      /* 3-c · send the image URL to the chatbot Worker */
+      const chatRes = await fetch(CHAT, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ message:'', image_url:imageURL })
+      }).then(r => r.json());
 
-        result.textContent = chat.reply;
-      } catch (err) {
-        console.error(err);
-        result.textContent = 'Sorry, something went wrong. Please try again.';
-      }
-    });
+      result.textContent = chatRes.reply;
+    } catch (err) {
+      console.error(err);
+      result.textContent = 'Sorry, something went wrong. Please try again.';
+    }
+  });
   </script>
 </body>
 </html>
