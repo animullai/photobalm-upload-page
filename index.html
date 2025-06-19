@@ -46,7 +46,7 @@ const CHAT   = WORKER + '/chat';            // Worker endpoint for ChatGPT
       /* 3a. get 1-time upload URL from Cloudflare Images */
       const upRes = await fetch(DIRECT, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${IMAGES_TOKEN}` }
+        
       }).then(r => r.json());
       const uploadURL = upRes.uploadURL;
 
