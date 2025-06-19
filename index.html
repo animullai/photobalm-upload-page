@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Photobalm Upload</title>
+  <title>Photobalm · upload</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="p-8">
@@ -16,47 +16,54 @@
 
   <pre id="result" class="mt-6 whitespace-pre-wrap text-gray-800"></pre>
 
-  <script type="module">
-    const fileInp = document.querySelector('#file');
-    const goBtn = document.querySelector('#go');
-    const result = document.querySelector('#result');
+  <script>
+    document.getElementById('go').addEventListener('click', async () => {
+      const fileInput = document.getElementById('file');
+      const resultBox = document.getElementById('result');
+      const file = fileInput.files[0];
 
-    const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';
-    const UPLOAD = WORKER + '/upload';
-    const CHAT = WORKER + '/chat';
+      resultBox.textContent = 'Loading...';
 
-    goBtn.addEventListener('click', async () => {
-      result.textContent = 'Uploading...';
-      const file = fileInp.files[0];
-      if (!file) return (result.textContent = 'No file selected.');
+      if (!file) {
+        resultBox.textContent = 'Please choose a file first.';
+        return;
+      }
 
       try {
-        const uploadRes = await fetch(UPLOAD, { method: 'POST' });
-        const { uploadURL } = await uploadRes.json();
-
-        const uploadToCloudflare = await fetch(uploadURL, {
+        // Step 1: Ask the Worker for a signed upload URL
+        const uploadResp = await fetch('https://photobalm-webhook.photobalm.workers.dev/upload', {
           method: 'POST',
-          body: file,
+        });
+        const uploadData = await uploadResp.json();
+        const uploadURL = uploadData.uploadURL;
+
+        if (!uploadURL) throw new Error('No upload URL returned');
+
+        // Step 2: Upload the image
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const cloudflareResp = await fetch(uploadURL, {
+          method: 'POST',
+          body: formData
         });
 
-        if (!uploadToCloudflare.ok) {
-          throw new Error(`Cloudflare upload failed: ${uploadToCloudflare.status}`);
-        }
+        if (!cloudflareResp.ok) throw new Error('Upload failed');
 
-        const location = uploadToCloudflare.headers.get('Location');
-        if (!location) throw new Error('Missing image location.');
+        const imgId = uploadURL.split('/').pop();
+        const imageURL = `https://imagedelivery.net/${imgId}/public`;
 
-        const chatRes = await fetch(CHAT, {
+        // Step 3: Ask GPT for a quote
+        const chatResp = await fetch('https://photobalm-webhook.photobalm.workers.dev/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: location })
+          body: JSON.stringify({ image_url: imageURL })
         });
 
-        const chatData = await chatRes.json();
-        result.textContent = chatData.reply || 'No reply returned.';
-
+        const chatData = await chatResp.json();
+        resultBox.textContent = chatData.reply || 'No response from assistant.';
       } catch (err) {
-        result.textContent = `Sorry, something went wrong.\n\n${err.message}`;
+        resultBox.textContent = 'Sorry, something went wrong.\n' + err.message;
       }
     });
   </script>
