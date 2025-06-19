@@ -1,77 +1,53 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Photobalm • upload</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
-</head>
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<title>Photobalm • upload</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
+</head><body class="p-8">
+<h1 class="text-3xl font-bold mb-6">Upload your photo</h1>
 
-<body class="p-8">
-  <h1 class="text-3xl font-bold mb-6">Upload your photo</h1>
+<input id="file" type="file" accept="image/*" class="mb-4">
+<button id="go" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
+  Get a quote
+</button>
+<pre id="result" class="mt-6 whitespace-pre-wrap text-gray-800"></pre>
 
-  <!-- file picker -->
-  <input id="file" type="file" accept="image/*" class="mb-4">
+<script type="module">
+const fileInp = document.querySelector('#file');
+const goBtn   = document.querySelector('#go');
+const result  = document.querySelector('#result');
 
-  <!-- trigger button -->
-  <button id="go" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
-    Get a quote
-  </button>
+/* your Worker root (same host handles both routes) */
+const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';
+const DIRECT = WORKER + '/direct-upload';   // now points to Worker, not Images API
+const CHAT   = WORKER;                      // POST for chat
 
-  <!-- where the assistant’s answer appears -->
-  <pre id="result" class="mt-6 whitespace-pre-wrap text-gray-800"></pre>
+goBtn.addEventListener('click', async () => {
+  const file = fileInp.files[0];
+  if (!file) { result.textContent = 'Please choose an image first.'; return; }
 
-  <!-- JS 👉 keep at end so DOM above already exists -->
-  <script type="module">
-  /* ---------- 1. DOM handles ---------- */
-  const fileInp = document.querySelector('#file');
-  const goBtn   = document.querySelector('#go');
-  const result  = document.querySelector('#result');
+  try {
+    // 1-time upload URL from Worker
+    const upRes   = await fetch(DIRECT).then(r => r.json());
+    const uploadU = upRes.uploadURL;
 
-  /* ---------- 2. endpoints ---------- */
-  const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';   // ChatGPT worker
+    // upload the file
+    const fd  = new FormData(); fd.append('file', file);
+    const imR = await fetch(uploadU, { method:'POST', body: fd }).then(r => r.json());
+    const img = imR.result.variants[0];
 
-  /*  🔴 EDIT JUST THESE TWO LINES 🔴 */
-  const ACCOUNT_ID   = 'ad633e37cbbb7cba033ab41483482e56';      // 32-char hex, no braces
-  const IMAGES_TOKEN = 'iKo_f8WwXCdqG9NzBplbLzg6PUhMLFxD5X_HBsXx';    // long token string
+    // chat
+    const chat = await fetch(CHAT, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ message:'', image_url: img })
+    }).then(r => r.json());
 
-  const DIRECT = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/images/v2/direct_upload`;
-  const CHAT   = WORKER;
-
-  /* ---------- 3. click handler ---------- */
-  goBtn.addEventListener('click', async () => {
-    const file = fileInp.files[0];
-    if (!file) { result.textContent = 'Please choose an image first.'; return; }
-
-    try {
-      /* 3a. get 1-time upload URL */
-      const upRes = await fetch(DIRECT, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${IMAGES_TOKEN}` }
-      }).then(r => r.json());
-
-      const uploadURL = upRes.uploadURL;
-
-      /* 3b. upload the file */
-      const fd = new FormData(); fd.append('file', file);
-      const imRes = await fetch(uploadURL, { method: 'POST', body: fd })
-                          .then(r => r.json());
-
-      const imageURL = imRes.result.variants[0];   // public HTTPS URL
-
-      /* 3c. ask the chatbot */
-      const chatRes = await fetch(CHAT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: '', image_url: imageURL })
-      }).then(r => r.json());
-
-      result.textContent = chatRes.reply;
-    } catch (err) {
-      console.error(err);
-      result.textContent = 'Sorry, something went wrong. Please try again.';
-    }
-  });
-  </script>
-</body>
-</html>
+    result.textContent = chat.reply;
+  } catch (e) {
+    console.error(e);
+    result.textContent = 'Sorry, something went wrong. Please try again.';
+  }
+});
+</script>
+</body></html>
