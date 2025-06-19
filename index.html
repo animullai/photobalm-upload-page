@@ -11,69 +11,43 @@
   <h1 class="text-3xl font-bold mb-6">Upload your photo</h1>
 
   <input id="file" type="file" class="mb-4" accept="image/*">
-  <button id="go"
-          class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
+  <button id="go" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
     Get a quote
   </button>
-
   <pre id="result" class="mt-6 whitespace-pre-wrap text-gray-800"></pre>
 
-<script type="module">
-/* DOM elements */
-const fileInp = document.querySelector('#file');
-const goBtn   = document.querySelector('#go');
-const result  = document.querySelector('#result');
+  <script type="module">
+    const fileInp = document.querySelector('#file');
+    const goBtn   = document.querySelector('#go');
+    const result  = document.querySelector('#result');
 
-/* Endpoints */
-const ACCOUNT_ID = 'ad633e37cbbb7cba033ab41483482e56';
-const IMAGES_TOKEN = 'iKo_f8WwXCdqG9NzBplbLzg6PUhMLFxD5X_HBsXx';
-const DIRECT = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/images/v2/direct_upload`;
-const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';
+    const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';
 
-/* Button logic */
-goBtn.addEventListener('click', async () => {
-  const file = fileInp.files[0];
-  if (!file) {
-    result.textContent = 'Please choose an image first.';
-    return;
-  }
-
-  try {
-    // 1. Ask Cloudflare Images for one-time upload URL
-    const upRes = await fetch(DIRECT, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${IMAGES_TOKEN}`
+    goBtn.addEventListener('click', async () => {
+      const file = fileInp.files[0];
+      if (!file) {
+        result.textContent = 'Please choose an image first.';
+        return;
       }
-    }).then(r => r.json());
 
-    const uploadURL = upRes.uploadURL;
-    if (!uploadURL) throw new Error('Failed to get upload URL');
+      result.textContent = 'Uploading and analyzing...';
 
-    // 2. Upload the file to Cloudflare Images
-    const fd = new FormData();
-    fd.append('file', file);
-    const imRes = await fetch(uploadURL, {
-      method: 'POST',
-      body: fd
-    }).then(r => r.json());
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
 
-    const imageURL = imRes.result.variants[0];
-    if (!imageURL) throw new Error('Failed to upload image');
+        const res = await fetch(WORKER + '/upload', {
+          method: 'POST',
+          body: fd
+        });
 
-    // 3. Send the image URL to the chatbot Worker
-    const chatRes = await fetch(WORKER, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: '', image_url: imageURL })
-    }).then(r => r.json());
-
-    result.textContent = chatRes.reply;
-  } catch (err) {
-    console.error(err);
-    result.textContent = 'Sorry, something went wrong. Please try again.';
-  }
-});
-</script>
+        const json = await res.json();
+        result.textContent = json.reply || 'Something went wrong.';
+      } catch (err) {
+        console.error(err);
+        result.textContent = 'Sorry, something went wrong. Please try again.';
+      }
+    });
+  </script>
 </body>
 </html>
