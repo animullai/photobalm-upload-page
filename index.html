@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Photobalm » upload</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photobalm Upload</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="p-8">
@@ -21,46 +21,42 @@
     const goBtn = document.querySelector('#go');
     const result = document.querySelector('#result');
 
-    // Your deployed Cloudflare Worker URL
     const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';
+    const UPLOAD = WORKER + '/upload';
+    const CHAT = WORKER + '/chat';
 
     goBtn.addEventListener('click', async () => {
+      result.textContent = 'Uploading...';
       const file = fileInp.files[0];
-      if (!file) {
-        result.textContent = 'Please select a file.';
-        return;
-      }
+      if (!file) return (result.textContent = 'No file selected.');
 
       try {
-        // Step 1: Get upload URL from Worker
-        const uploadResp = await fetch(WORKER + '/upload', { method: 'POST' });
-        const uploadData = await uploadResp.json();
+        const uploadRes = await fetch(UPLOAD, { method: 'POST' });
+        const { uploadURL } = await uploadRes.json();
 
-        if (!uploadData.uploadURL) {
-          throw new Error('No upload URL returned from server.');
-        }
-
-        // Step 2: Upload the file directly to Cloudflare Images
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const cloudResp = await fetch(uploadData.uploadURL, {
+        const uploadToCloudflare = await fetch(uploadURL, {
           method: 'POST',
-          body: formData,
+          body: file,
         });
 
-        const cloudJson = await cloudResp.json();
-
-        if (!cloudResp.ok) {
-          throw new Error(`Upload failed: ${cloudJson?.errors?.[0]?.message || cloudResp.status}`);
+        if (!uploadToCloudflare.ok) {
+          throw new Error(`Cloudflare upload failed: ${uploadToCloudflare.status}`);
         }
 
-        // Step 3: Display result
-        result.textContent = JSON.stringify(cloudJson, null, 2);
+        const location = uploadToCloudflare.headers.get('Location');
+        if (!location) throw new Error('Missing image location.');
+
+        const chatRes = await fetch(CHAT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_url: location })
+        });
+
+        const chatData = await chatRes.json();
+        result.textContent = chatData.reply || 'No reply returned.';
 
       } catch (err) {
-        result.textContent = 'Upload error: ' + err.message;
-        console.error(err);
+        result.textContent = `Sorry, something went wrong.\n\n${err.message}`;
       }
     });
   </script>
