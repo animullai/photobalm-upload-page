@@ -32,10 +32,13 @@
   /* ---------- 2. endpoints ---------- */
   const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';      // leave as-is
 
-  const DIRECT = WORKER + '/direct-upload';   // Worker endpoint for image upload
-const CHAT   = WORKER + '/chat';            // Worker endpoint for ChatGPT
-// (No Account-ID or token ever appears in the browser any more)
-          // Worker root handles chat
+/* 👉 your own Cloudflare Images account info */
+const ACCOUNT_ID   = 'ad633e37cbbb7cba033ab41483482e56';   // keep the quotes
+const IMAGES_TOKEN = 'iKo_f8WwXCdqG9NzBplbLzg6PUhMLFxD5X_HBsXx';
+
+const DIRECT = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/images/v2/direct_upload`;
+const CHAT   = WORKER;        // the Worker root still handles chat
+
 
   /* ---------- 3. handle click ---------- */
   goBtn.addEventListener('click', async () => {
