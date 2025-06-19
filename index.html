@@ -1,49 +1,76 @@
-<script type="module">
-/* ---------- 1. get DOM handles ---------- */
-const fileInp = document.querySelector('#file');
-const goBtn   = document.querySelector('#go');
-const result  = document.querySelector('#result');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Photobalm • upload</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Tailwind (for quick styling) -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
+</head>
 
-/* ---------- 2. endpoints ---------- */
-const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';   // already fine
+<body class="p-8">
+  <h1 class="text-3xl font-bold mb-6">Upload your photo</h1>
 
-// 👉 replace the next two placeholders (keep the quotes)
-const ACCOUNT_ID = 'ad633e37cbbb7cba033ab41483482e56';          // e.g. ad633e37cb...
-const IMAGES_TOKEN = 'iKo_f8WwXCdqG9NzBplbLzg6PUhMLFxD5X_HBsXx';      // the long token you created
+  <!-- ① the file picker -->
+  <input id="file" type="file" class="mb-4" accept="image/*">
 
-const DIRECT = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/images/v2/direct_upload`;
-const CHAT   = WORKER;    // Worker’s root handles chat
+  <!-- ② the button -->
+  <button id="go" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
+    Get a quote
+  </button>
 
-/* ---------- 3. handle click ---------- */
-goBtn.addEventListener('click', async () => {
-  const file = fileInp.files[0];
-  if (!file) { result.textContent = 'Please choose an image first.'; return; }
+  <!-- ③ where the reply appears -->
+  <pre id="result" class="mt-6 whitespace-pre-wrap text-gray-800"></pre>
 
-  try {
-    /* 3a. get 1-time upload URL from Cloudflare Images */
-    const upRes = await fetch(DIRECT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${IMAGES_TOKEN}` }
-    }).then(r => r.json());
-    const uploadURL = upRes.uploadURL;
+  <!-- ④ the JavaScript (kept at the very end so the DOM above already exists) -->
+  <script type="module">
+  /* ---------- 1. get DOM handles ---------- */
+  const fileInp = document.querySelector('#file');
+  const goBtn   = document.querySelector('#go');
+  const result  = document.querySelector('#result');
 
-    /* 3b. upload the actual file */
-    const fd = new FormData(); fd.append('file', file);
-    const imRes = await fetch(uploadURL, { method:'POST', body: fd })
-                        .then(r => r.json());
-    const imageURL = imRes.result.variants[0];      // public https URL
+  /* ---------- 2. endpoints ---------- */
+  const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';      // leave as-is
 
-    /* 3c. send image URL to your chatbot Worker */
-    const chatRes = await fetch(CHAT, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ message:'', image_url:imageURL })
-    }).then(r=>r.json());
+  /* 👉 PASTE YOUR OWN VALUES between the quotes below (keep quotes, keep semicolon) */
+  const ACCOUNT_ID   = 'ad633e37cbbb7cba033ab41483482e56';
+  const IMAGES_TOKEN = 'iKo_f8WwXCdqG9NzBplbLzg6PUhMLFxD5X_HBsXx';
 
-    result.textContent = chatRes.reply;
-  } catch (err) {
-    console.error(err);
-    result.textContent = 'Sorry, something went wrong. Please try again.';
-  }
-});
-</script>
+  const DIRECT = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/images/v2/direct_upload`;
+  const CHAT   = WORKER;          // Worker root handles chat
+
+  /* ---------- 3. handle click ---------- */
+  goBtn.addEventListener('click', async () => {
+    const file = fileInp.files[0];
+    if (!file) { result.textContent = 'Please choose an image first.'; return; }
+
+    try {
+      /* 3a. get 1-time upload URL from Cloudflare Images */
+      const upRes = await fetch(DIRECT, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${IMAGES_TOKEN}` }
+      }).then(r => r.json());
+      const uploadURL = upRes.uploadURL;
+
+      /* 3b. upload the actual file */
+      const fd = new FormData(); fd.append('file', file);
+      const imRes = await fetch(uploadURL, { method:'POST', body: fd })
+                            .then(r => r.json());
+      const imageURL = imRes.result.variants[0];      // public https URL
+
+      /* 3c. send image URL to your chatbot Worker */
+      const chatRes = await fetch(CHAT, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ message: '', image_url: imageURL })
+      }).then(r => r.json());
+
+      result.textContent = chatRes.reply;
+    } catch (err) {
+      console.error(err);
+      result.textContent = 'Sorry, something went wrong. Please try again.';
+    }
+  });
+  </script>
+</body>
+</html>
