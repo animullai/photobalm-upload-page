@@ -2,34 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Photobalm • Upload</title>
+  <title>Photobalm • upload</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
 </head>
-
 <body class="p-8">
   <h1 class="text-3xl font-bold mb-6">Upload your photo</h1>
 
-  <!-- File picker -->
   <input id="file" type="file" class="mb-4" accept="image/*">
-
-  <!-- Button -->
   <button id="go" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">
     Get a quote
   </button>
 
-  <!-- Where the reply appears -->
   <pre id="result" class="mt-6 whitespace-pre-wrap text-gray-800"></pre>
 
   <script type="module">
     const fileInp = document.querySelector('#file');
-    const goBtn = document.querySelector('#go');
-    const result = document.querySelector('#result');
+    const goBtn   = document.querySelector('#go');
+    const result  = document.querySelector('#result');
 
-    // Endpoints
+    // Use the root Worker route only
     const WORKER = 'https://photobalm-webhook.photobalm.workers.dev';
-    const DIRECT = WORKER + '/direct-upload';
-    const CHAT = WORKER + '/chat';
 
     goBtn.addEventListener('click', async () => {
       const file = fileInp.files[0];
@@ -39,21 +32,13 @@
       }
 
       try {
-        // Get upload URL
-        const upRes = await fetch(DIRECT, { method: 'POST' }).then(r => r.json());
-        const uploadURL = upRes.result.uploadURL;
-
-        // Upload file
         const fd = new FormData();
         fd.append('file', file);
-        const imRes = await fetch(uploadURL, { method: 'POST', body: fd }).then(r => r.json());
-        const imageURL = imRes.result.variants[0];
 
-        // Send to Worker
-        const chatRes = await fetch(CHAT, {
+        // Send file to your Worker, which will handle both upload and GPT
+        const chatRes = await fetch(WORKER, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: '', image_url: imageURL })
+          body: fd
         }).then(r => r.json());
 
         result.textContent = chatRes.reply;
