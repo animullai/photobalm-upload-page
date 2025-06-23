@@ -2,72 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Photobalm Upload</title>
+  <title>PhotoBalm Upload</title>
 </head>
 <body>
   <h1>Upload your photo</h1>
-  <form id="uploadForm">
-    <input type="file" name="file" id="fileInput" />
-    <button type="submit">Get a quote</button>
-  </form>
-  <pre id="result">Waiting for upload...</pre>
+  <input type="file" id="file-input" accept="image/*" />
+  <button id="upload-btn">Get a quote</button>
+  <pre id="result"></pre>
 
   <script>
-    const form = document.querySelector("#uploadForm");
-    const fileInput = document.querySelector("#fileInput");
-    const resultText = document.querySelector("#result");
+    const ACCOUNT_HASH = "dCd8n83KAE_qsvas-8wNGA"; // your Cloudflare Images account hash
+    const WORKER_URL = "https://photobalm-webhook.photobalm.workers.dev/";
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      resultText.textContent = "Uploading...";
+    document.getElementById("upload-btn").onclick = async () => {
+      const file = document.getElementById("file-input").files[0];
+      if (!file) return alert("Please choose a file first");
 
-      const file = fileInput.files[0];
-      if (!file) {
-        resultText.textContent = "Please select a file.";
-        return;
-      }
+      // 1. Get an upload URL from our Worker
+      const { uploadURL, id } = await fetch(WORKER_URL, { method: "POST" })
+        .then(r => r.json());
 
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        const response = await fetch("https://photobalm-webhook.photobalm.workers.dev/upload", {
+      // 2. Upload the file directly to Cloudflare Images
+      const form = new FormData();
+      form.append("file", file);
+      const apiToken = await fetch("/.wrangler/env/IMAGES_API_TOKEN").then(r => r.text());
+      const imagesResponse = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_HASH}/images/v1`,
+        {
           method: "POST",
-          body: formData
-          // DO NOT set Content-Type manually — the browser will do it with the correct boundary
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          resultText.textContent = `Upload failed: ${text}`;
-          return;
+          headers: { Authorization: `Bearer ${apiToken}` },
+          body: form
         }
+      ).then(r => r.json());
 
-        const result = await response.json();
-        if (!result || !result.uploadURL) {
-          resultText.textContent = "No upload URL returned.";
-          return;
-        }
-
-        // Final step: upload the file to the provided Cloudflare URL
-        const uploadResponse = await fetch(result.uploadURL, {
-          method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-
-        if (!uploadResponse.ok) {
-          const text = await uploadResponse.text();
-          resultText.textContent = `Upload to Images failed: ${text}`;
-          return;
-        }
-
-        resultText.textContent = "Upload successful!";
-      } catch (err) {
-        resultText.textContent = `Sorry, something went wrong.\n${err}`;
-      }
-    });
+      // 3. Show the result
+      document.getElementById("result").textContent =
+        imagesResponse.success
+          ? `✔️ Stored as ${imagesResponse.result.id}`
+          : `❌ Upload failed: ${JSON.stringify(imagesResponse, null, 2)}`;
+    };
   </script>
 </body>
 </html>
